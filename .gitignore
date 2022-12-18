@@ -1,0 +1,9 @@
+# Archiso
+/out/
+/work/
+
+# Packages
+/planeta/
+
+# planeta
+/rootfs.tar.zst
