@@ -1,3 +1,6 @@
 [submodule "packages/yay-bin"]
 	path = packages/yay-bin
 	url = https://aur.archlinux.org/yay-bin.git
+[submodule "packages/vscodium-bin"]
+	path = packages/vscodium-bin
+	url = https://aur.archlinux.org/vscodium-bin.git
