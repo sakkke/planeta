@@ -1,0 +1,3 @@
+[submodule "packages/yay-bin"]
+	path = packages/yay-bin
+	url = https://aur.archlinux.org/yay-bin.git
