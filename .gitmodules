@@ -10,3 +10,6 @@
 [submodule "packages/linux-xanmod-rt"]
 	path = packages/linux-xanmod-rt
 	url = https://aur.archlinux.org/linux-xanmod-rt.git
+[submodule "packages/mindustry-bin"]
+	path = packages/mindustry-bin
+	url = https://aur.archlinux.org/mindustry-bin.git
