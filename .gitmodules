@@ -4,3 +4,6 @@
 [submodule "packages/vscodium-bin"]
 	path = packages/vscodium-bin
 	url = https://aur.archlinux.org/vscodium-bin.git
+[submodule "packages/asdf-vm"]
+	path = packages/asdf-vm
+	url = https://aur.archlinux.org/asdf-vm.git
