@@ -7,3 +7,6 @@
 [submodule "packages/asdf-vm"]
 	path = packages/asdf-vm
 	url = https://aur.archlinux.org/asdf-vm.git
+[submodule "packages/linux-xanmod-rt"]
+	path = packages/linux-xanmod-rt
+	url = https://aur.archlinux.org/linux-xanmod-rt.git
