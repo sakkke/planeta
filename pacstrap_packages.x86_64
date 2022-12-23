@@ -1,3 +1,57 @@
+# Base
 base
 linux
 linux-firmware
+
+# Firmwares
+linux-firmware-bnx2x
+linux-firmware-liquidio
+linux-firmware-marvell
+linux-firmware-mellanox
+linux-firmware-nfp
+linux-firmware-qcom
+linux-firmware-qlogic
+linux-firmware-whence
+
+# Drivers
+broadcom-wl-dkms
+xorg-drivers
+
+# Additional
+base-devel
+blender
+brightnessctl
+btrfs-progs
+deno
+docker
+dosfstools
+firefox
+gimp
+git
+inkscape
+iwd
+jdk-openjdk
+kdenlive
+kitty
+libreoffice-fresh
+lmms
+lxde
+mandoc
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
+noto-fonts-extra
+openjdk-doc
+papirus-icon-theme
+parted
+vi
+vim
+virtualbox
+virtualbox-host-dkms
+
+# @exit-pkg-add
+asdf-vm
+linux-xanmod-rt
+mindustry-bin
+vscodium-bin
+yay-bin

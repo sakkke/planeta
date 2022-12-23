@@ -6,4 +6,9 @@
 /planeta/
 
 # planeta
-/rootfs.tar.zst
+/airootfs/efi.tar.zst
+/airootfs/root.tar.zst
+/airootfs/usr/bin/planeta
+/efi.fat
+/root.btrfs
+/root/

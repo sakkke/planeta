@@ -1,0 +1,130 @@
+#!/bin/bash
+
+set -e
+
+x11_keymap_layout_prompt='Keymap layout: '
+x11_keymap_layout="$(localectl list-x11-keymap-layouts --no-pager | fzf --height=90% --layout=reverse --prompt="$x11_keymap_layout_prompt")"
+echo "$x11_keymap_layout_prompt""$x11_keymap_layout"
+x11_keymap_model_prompt='Keymap model: '
+x11_keymap_model="$(cat <(echo) <(localectl list-x11-keymap-models --no-pager) | fzf --height=90% --layout=reverse --prompt="$x11_keymap_model_prompt")"
+echo "$x11_keymap_model_prompt""$x11_keymap_model"
+
+if [[ $x11_keymap_model != '' ]]; then
+    x11_keymap_variant_prompt='Keymap variant: '
+    x11_keymap_variant="$(cat <(echo) <(localectl list-x11-keymap-variants --no-pager) | fzf --height=90% --layout=reverse --prompt="$x11_keymap_variant_prompt")"
+    echo "$x11_keymap_variant_prompt""$x11_keymap_variant"
+fi
+
+if [[ $x11_keymap_variant != '' ]]; then
+    x11_keymap_options_prompt='Keymap options (multiple selections available by tab): '
+
+    x11_keymap_options="$(cat <(echo) <(localectl list-x11-keymap-options --no-pager) \
+        | fzf --height=90% --layout=reverse --prompt="$x11_keymap_options_prompt" -m \
+        | tr '\0' ',' \
+        | sed 's/,$//')"
+
+    echo "$x11_keymap_options_prompt""$x11_keymap_options"
+fi
+
+if [[ -n $x11_keymap_model ]]; then
+    setxkbmap -model "$x11_keymap_model" "$x11_keymap_layout" $x11_keymap_variant $x11_keymap_options
+else
+    setxkbmap "$x11_keymap_layout" $x11_keymap_variant $x11_keymap_options
+fi
+
+diskpath_prompt='Diskpath: '
+
+diskpath="$(sfdisk -l \
+    | grep '^Disk /' \
+    | awk '{ s = $2; print substr(s, 1, length(s) - 1) }' \
+    | fzf --height=90% --layout=reverse --preview='sfdisk -l {}' --prompt="$diskpath_prompt")"
+
+echo "$diskpath_prompt""$diskpath"
+timezone_prompt='Timezone: '
+timezone="$(timedatectl list-timezones --no-pager | fzf --height=90% --layout=reverse --prompt="$timezone_prompt")"
+
+echo "$timezone_prompt""$timezone"
+locales_prompt='Locales (multiple selections available by tab): '
+
+locales="$(cat /etc/locale.gen \
+    | grep '^#[a-z]' \
+    | sed 's/^#//' \
+    | fzf --height=90% --layout=reverse --prompt="$locales_prompt" --print0 -m \
+    | tr '\0' ',' \
+    | sed 's/,$//')"
+
+echo "$locales_prompt""$locales"
+default_locale_prompt='Default locale: '
+default_locale="$(tr ',' '\0' <<< "$locales" | fzf --height=90% --layout=reverse --prompt="$default_locale_prompt" --read0 -1)"
+echo "$default_locale_prompt""$default_locale"
+
+validate_hostname() {
+    local hostname="$1"
+
+    if ! grep -Pq '^(?!-)[a-z0-9-]{1,63}(?<!-)$' <<< "$hostname"; then
+        echo 'Invalid hostname. Please again.'
+        return 1
+    fi
+}
+
+while ! { read -p 'Hostname: ' hostname && validate_hostname "$hostname"; } do :; done
+
+validate_username() {
+    local username="$1"
+
+    if ! grep -Eq '^[a-z_]([a-z0-9_-]{0,31}|[a-z0-9_-]{0,30}\$)$' <<< "$username"; then
+        echo 'Invalid username. Please again.'
+        return 1
+    fi
+}
+
+while ! { read -p 'Username: ' username && validate_username "$username"; } do :; done
+
+parted -s "$diskpath" \
+    mklabel gpt \
+    mkpart efi fat32 0% 300MiB \
+    set 1 esp on \
+    mkpart root btrfs 300MiB 100%
+
+efi=/dev/disk/by-partlabel/efi
+udevadm wait "$efi"
+root=/dev/disk/by-partlabel/root
+udevadm wait "$root"
+mkfs.fat -F 32 "$efi"
+mkfs.btrfs -f "$root"
+mnt=/mnt
+mount "$root" "$mnt"
+root_default_label=@
+btrfs subvolume create "$mnt"/"$root_default_label"
+root_home_label=@home
+btrfs subvolume create "$mnt"/"$root_home_label"
+umount "$mnt"
+root_dir=/
+root_default_mountpoint="$(realpath "$mnt""$root_dir")"
+mount --mkdir -o compress=zstd,subvol="$root_default_label" "$root" "$root_default_mountpoint"
+home_dir=/home
+root_home_mountpoint="$(realpath "$mnt""$home_dir")"
+mount --mkdir -o compress=zstd,subvol="$root_home_label" "$root" "$root_home_mountpoint"
+efi_dir=/boot
+efi_mountpoint="$(realpath "$mnt""$efi_dir")"
+mount --mkdir "$efi" "$efi_mountpoint"
+root_fsimage=/root.tar.zst
+pv "$root_fsimage" | tar --zstd -xf - -C "$root_default_mountpoint"
+efi_fsimage=/efi.tar.zst
+pv "$efi_fsimage" | tar --no-same-owner --zstd -xf - -C "$efi_mountpoint"
+genfstab -t PARTLABEL "$root_default_mountpoint" >> "$root_default_mountpoint"/etc/fstab
+arch-chroot "$root_default_mountpoint" ln -sf /usr/share/zoneinfo/"$timezone" /etc/localtime
+arch-chroot "$root_default_mountpoint" hwclock --systohc
+
+while IFS= read -r locale; do
+    arch-chroot "$root_default_mountpoint" sed -i 's/^#\('"$locale"'\)$/\1/' /etc/locale.gen
+done < <(sed 's/\./\./g' <<< "$locales" | tr , '\n')
+
+arch-chroot "$root_default_mountpoint" locale-gen
+echo LANG="$(awk '{ print $1 }' <<< "$default_locale")" > "$root_default_mountpoint"/etc/locale.conf
+#arch-chroot "$root_default_mountpoint" localectl set-x11-keymap "$x11_keymap_layout" $x11_keymap_model $x11_keymap_variant $x11_keymap_options
+echo "$hostname" > "$root_default_mountpoint"/etc/hostname
+arch-chroot "$root_default_mountpoint" useradd -mG docker,wheel "$username"
+while ! arch-chroot "$root_default_mountpoint" passwd "$username"; do :; done
+arch-chroot "$root_default_mountpoint" bootctl install
+umount -R "$root_default_mountpoint"
